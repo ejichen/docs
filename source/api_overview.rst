@@ -83,17 +83,195 @@ Although the interface currently does not support any of the ``pointing_axis`` o
 fields, it points the `head_tilt_link` (which is very near the camera optical
 axis) towards the `target` point to achieve a similar effect. A ``min_duration`` or ``max_velocity`` can also be specified.
 
+.. image:: _static/point_head.gif
+
+Demo
+~~~~
+Launch the simulation in Gazebo
+::
+
+  roslaunch fetch_gazebo pickplace_playground.launch
+
+Make the script executable
+::
+
+  chmod u+x point_head.py
+
+Run the script from fetch_demo on GitHub. 
+TODO_: provide the link, change the command when the package is made 
+::
+  python point_head.py
+
+Here's the script for poiting the head to the desire point.
+::
+  #!/usr/bin/env python
+
+  import rospy
+  import actionlib
+  from control_msgs.msg import PointHeadAction, PointHeadGoal
+
+
+  class PointHeadClient(object):
+      def __init__(self):
+          # init the action client of the robot and wait fot the server
+          self.client = actionlib.SimpleActionClient("head_controller/point_head", PointHeadAction)
+          rospy.loginfo("Waiting for head_controller...")
+          self.client.wait_for_server()
+      
+      def look_at(self, x, y, z, frame, duration=1.0):
+          # init the control msgs and send it to the action server
+          goal = PointHeadGoal()
+          goal.target.header.stamp = rospy.Time.now()
+          goal.target.header.frame_id = frame
+          goal.target.point.x = x
+          goal.target.point.y = y
+          goal.target.point.z = z
+          goal.min_duration = rospy.Duration(duration)
+          self.client.send_goal(goal)
+          self.client.wait_for_result()
+
+  if __name__ == "__main__":
+      rospy.init_node("fetch_demo_node")
+      
+      # init the point head client 
+      head_action = PointHeadClient()
+      while not rospy.is_shutdown():
+          # send the points to the client, the head will look at the point 
+          # the sleep is for the head to fully move to the point 
+          head_action.look_at(1.0, 1.0, 0.5, "base_link")
+          rospy.sleep(1.5)
+          head_action.look_at(1.0, 0.0, 0.5, "base_link")
+          rospy.sleep(1.5)
+          head_action.look_at(1.0, -1.0, 0.5, "base_link")
+          rospy.sleep(1.5)
+          head_action.look_at(1.0, 0.0, 0.5, "base_link")
+          rospy.sleep(1.5)
+          head_action.look_at(1.0, 0.0, 0.8, "base_link")
+          rospy.sleep(1.5)
+          head_action.look_at(1.0, 0.0, 0.3, "base_link")
+          rospy.sleep(1.5)
+
+Code Explained
+~~~~~~~~~~~~~~
+Let's break down the code.
+::
+  def look_at(self, x, y, z, frame, duration=1.0):
+      # init the control msgs and send it to the action server
+      goal = PointHeadGoal()
+      goal.target.header.stamp = rospy.Time.now()
+      goal.target.header.frame_id = frame
+      goal.target.point.x = x
+      goal.target.point.y = y
+      goal.target.point.z = z
+      goal.min_duration = rospy.Duration(duration)
+      self.client.send_goal(goal)
+      self.client.wait_for_result()
+
+Put the values into `control_msgs/PointHeadGoal <http://docs.ros.org/lunar/api/control_msgs/html/action/PointHead.html>`_.
+ - ``x, y, z`` are the position to look at. 
+ - ``frame`` is the frame of the point.
+ - ``duration`` is the minimum time for the head to complete the task.
+
+
+::
+
+   head_action.look_at(1.0, 1.0, 0.5, "base_link")
+   rospy.sleep(1.5)
+
+The head is going to look at point  ``1.0, 1.0, 0.5`` in the frame of ``base_link``. 
+The sleep time is for the head to fully move to the pose before executing the next move.
+
 .. _gripper_api:
 
 Gripper Interface
 -----------------
+.. image:: _static/gripper.gif
+
+
+Demo
+~~~~
+Launch the simulation in Gazebo
+::
+
+  roslaunch fetch_gazebo pickplace_playground.launch
+
+Make the script executable
+::
+
+  python gripper.py
+  
+The script for controlling the gripper:
+::
+  #!/usr/bin/env python
+
+  import rospy
+  import actionlib
+  from control_msgs.msg import GripperCommandAction, GripperCommandGoal
+
+  class GripperClient(object):
+      def __init__(self):
+          # init the action client of the robot and wait fot the server
+          self.gripper_client = actionlib.SimpleActionClient("gripper_controller/gripper_action", GripperCommandAction)
+          rospy.loginfo("Waiting for gripper controller...")
+          self.gripper_client.wait_for_server()
+          rospy.loginfo("The gripper controller is launched")
+
+      def close_gripper_to(self, position, max_effor=50):
+          # send the position of the gripper, 0.0 is fully closed and 0.1 is fully open
+          goal = GripperCommandGoal()
+          goal.command.position = position
+          goal.command.max_effort = max_effor 
+          self.gripper_client.send_goal(goal)
+          self.gripper_client.wait_for_result()
+          rospy.sleep(1.0)
+
+      def fully_open_gripper(self):
+          self.close_gripper_to(0.1)
+      
+      def fully_close_gripper(self):
+          self.close_gripper_to(0.0)
+
+  if __name__ == "__main__":
+      rospy.init_node("fetch_demo_node")
+      
+      # init the gripper client 
+      gripper_action = GripperClient()
+      while not rospy.is_shutdown():
+          rospy.loginfo("Closing the gripper")
+          gripper_action.fully_close_gripper()
+          rospy.sleep(1.0)
+          rospy.loginfo("Opening the gripper")
+          gripper_action.fully_open_gripper()
+          rospy.sleep(1.0)
+          rospy.loginfo("Closing the gripper to 0.04")
+          gripper_action.close_gripper_to(0.04)
+          rospy.sleep(1.0)
+
+Code Explained
+~~~~~~~~~~~~~~
+:: 
+
+  def close_gripper_to(self, position, max_effor=50):
+    # send the position of the gripper, 0.0 is fully closed and 0.1 is fully open
+    goal = GripperCommandGoal()
+    goal.command.position = position
+    goal.command.max_effort = max_effor 
+    self.gripper_client.send_goal(goal)
+    self.gripper_client.wait_for_result()
+    rospy.sleep(1.0)
+
+
 `gripper_controller/gripper_action` exposes a
 `control_msgs/GripperCommand <http://docs.ros.org/api/control_msgs/html/action/GripperCommand.html>`_
-ActionServer. The gripper command takes in ``position`` and ``effort`` as parameters. Generally,
-the gripper is commanded to a fully closed or fully opened position, so
-``effort`` is used to limit the maximum effort. As the gripper never fully reaches
-the closed position, the grasp strength will be determined by the maximum
-effort.
+ActionServer. The gripper command takes in ``position`` and ``effort`` as parameters.
+ 
+ - ``position`` (the unit is m) is the position of the gripper, 0.0 is fully closed and 0.1 is fully open.
+ -  ``effort`` is used to limit the maximum effort. Generally, the gripper is commanded to a fully closed or fully opened position. As the gripper never fully reaches the closed position, the grasp strength will be determined by the maximum effort.
+
+:: 
+
+  gripper_action.close_gripper_to(0.04)
+Close the gripper to position 0.04
 
 .. _camera_api:
 
