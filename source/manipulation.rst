@@ -21,8 +21,137 @@ to and from.
 
 Running the Pick and Place Demo
 -------------------------------
+Pick and Place Demo
+~~~~~~~~~~~~~~~~~~~
 
+
+Follow the commands to run the pick and place demo in the Gazebo. First, launch the Gazebo. 
+
+::
+
+    roslaunch fetch_gazebo pickplace_playground.launch
+
+After the Gazebo is fully launched, launch the pick and place demo.
+
+:: 
+
+    roslaunch fetch_gazebo_demo pick_place_demo.launch 
+
+
+After entering the commands, you should see something like the video below.
+
+.. raw:: html
+
+    <div style="position: relative; padding-bottom: 5%; height: 0; overflow: hidden; max-width: 100%; height: auto;">
+        <iframe width="700px" height="400px" src="https://www.youtube.com/embed/mfUdIxrt7DM" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+
+Code Explain
+~~~~~~~~~~~~
+The manipulation node receive the message from the perception node by a message type named Object
+under the grasping_msgs. Which could be found `here <http://wiki.ros.org/grasping_msgs>`_. 
+Here is the format of the message:
+::
+
+    ###########################################################
+    # This message describes an object.
+
+    # Many of the geometric items below lack a stamp/frame_id,
+    # header stamp/frame_id should be used there
+    std_msgs/Header header
+
+    # An object might have a name
+    string name
+
+    # An object might have a known (named) support surface
+    string support_surface
+
+    # Objects might have properties, such as type/class, or color, etc.
+    ObjectProperty[] properties
+
+    ###########################################################
+    # Objects have many possible descriptions
+    #  The following are the possible description formats
+
+    # Perception modules often represent an object as a cluster of points
+    #  Is considered valid if number of points > 0
+    sensor_msgs/PointCloud2 point_cluster
+
+    # MoveIt prefers solid primitives or meshes as a description of objects
+    shape_msgs/SolidPrimitive[] primitives
+    geometry_msgs/Pose[] primitive_poses
+
+    shape_msgs/Mesh[] meshes
+    geometry_msgs/Pose[] mesh_poses
+
+    # An object representing a support surface might be described by a plane
+    # Is considered valid if coefficients are not all 0s.
+    shape_msgs/Plane surface
+
+Once the grasping node has received the information it needs, 
+it will add the surfaces (in the pick place play ground the surface is the table) 
+as well as the grspable objects in the `planning scene <http://docs.ros.org/melodic/api/moveit_tutorials/html/doc/planning_scene/planning_scene_tutorial.html>`_
+by the lines below in the function updateScene. 
+
+:: 
+
+    for obj in find_result.objects:
+        idx += 1
+        obj.object.name = "object%d"%idx
+        self.scene.addSolidPrimitive(obj.object.name,
+                                        obj.object.primitives[0],
+                                        obj.object.primitive_poses[0],
+                                        use_service = False)
+        if obj.object.primitive_poses[0].position.x < 0.85:
+            objects.append([obj, obj.object.primitive_poses[0].position.z])
+
+    for obj in find_result.support_surfaces:
+        # extend surface to floor, and make wider since we have narrow field of view
+        height = obj.primitive_poses[0].position.z
+        obj.primitives[0].dimensions = [obj.primitives[0].dimensions[0],
+                                        1.5,  # wider
+                                        obj.primitives[0].dimensions[2] + height]
+        obj.primitive_poses[0].position.z += -height/2.0
+
+        # add to scene
+        self.scene.addSolidPrimitive(obj.name,
+                                        obj.primitives[0],
+                                        obj.primitive_poses[0],
+                                        use_service = True
+                                        )
+
+You could observe the objects have been added to the planning scene by launching rviz.
+:: 
+
+    rviz
+
+|pic1| |pic2|
+
+.. |pic1| image:: _static/pick_place_rviz.png
+   :width: 48%
+
+.. |pic2| image:: _static/pick_place_gazebo.png
+   :width: 48%
+
+The pick and place are completed through `moveit_python.pick_place_interface.PickPlaceInterface <http://docs.ros.org/jade/api/moveit_python/html/classmoveit__python_1_1pick__place__interface_1_1PickPlaceInterface.html>`_. 
+The functions pick and place take in the `moveit_msgs/Grasp <http://docs.ros.org/melodic/api/moveit_msgs/html/msg/Grasp.html>`_ and Object type messages to complete the actions.
+
+You could also run the demo with the navigation,
 See :ref:`mm_demo`.
+
+
+Pick Cubes into Bins by Color
+-----------------------------
+
+.. raw:: html
+
+    <div style="position: relative; padding-bottom: 5%; height: 0; overflow: hidden; max-width: 100%; height: auto;">
+        <iframe width="700px" height="400px" src="https://www.youtube.com/embed/eceIC79FPKg" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+
+
+The Fetch will scan the environment first and use the combined pointcloud to find out graspable obejcts. 
+
 
 Running MoveIt! on a Robot
 -----------------------------
@@ -39,6 +168,8 @@ the `MoveIt! Rviz Plugin <http://docs.ros.org/indigo/api/moveit_ros_visualizatio
 
 Simple MoveIt! Disco Example
 ----------------------------
+.. image:: _static/disco.gif
+
 
 This python script will run the robot through a simple disco dance motion.
 
@@ -117,11 +248,14 @@ This python script will run the robot through a simple disco dance motion.
       move_group.get_move_action().cancel_all_goals()
 
 
+
 Simple MoveIt! Wave Example
 ---------------------------
 
 This python script will cause the robot to do a simple "wave-like" motion
 until the script is stopped with ctrl-c
+
+.. image:: _static/wave.gif
 
 ::
 
